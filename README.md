@@ -46,7 +46,7 @@ A simple, interactive stock screener web app built with [Streamlit](https://stre
 
 1. **Run the app using Streamlit:**
 ```
-python -m streamlit run dashboard.py
+streamlit run dashboard.py
 ```
 
 2. **If that doesn't work, try this alternative:**
