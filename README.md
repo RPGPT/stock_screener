@@ -44,17 +44,17 @@ A simple, interactive stock screener web app built with [Streamlit](https://stre
 
 ## Usage
 
-To start the app, run:
-    ```
-    python -m streamlit run dashboard.py
-    ```
-If that doesn't work, try:
-    ```
-    python -m streamlit run dashboard.py
-    ```
+1. **Run the app using Streamlit:**
+```
+python -m streamlit run dashboard.py
+```
 
-Dashboard will be hosted on port 8501 by default.
+2. **If that doesn't work, try this alternative:**
+```
+python -m streamlit run dashboard.py
+```
 
+Dashboard will be hosted on port `8501` by default.
 ---
 
 ## Notes
