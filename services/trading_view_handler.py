@@ -1,7 +1,6 @@
 from tradingview_screener.column import col
 from tradingview_screener.query import Query
 from http.cookiejar import CookieJar
-from utils.formatting import format_number
 import requests
 
 def authenticate(username: str, password: str) -> CookieJar:
@@ -50,6 +49,5 @@ def screen_trading_view(pct_drop=None, financials=False, cookies=None):
     query.set_property('symbols', {'query': {'types': ['stock', 'fund', 'dr', 'structured']}})
     
     _, df = query.get_scanner_data(cookies=cookies)
-    df['market_cap_basic'] = df['market_cap_basic'].apply(format_number)
     
     return df

@@ -4,6 +4,7 @@ from utils.cache import load_cache, save_cache, clear_all_cache
 from models.column_map import COLUMN_MAP
 from screeners.config import SCREENERS
 import time
+import pandas as pd
 
 COOKIES = {'sessionid': 'SESSION_ID_HERE'}
 
@@ -28,13 +29,6 @@ with options_col:
             clear_all_cache()
             st.success("✅ Cache cleared!")
 
-def format_percentage(value):
-    try:
-        num = float(str(value).replace('%', ''))
-    except:
-        num = 0
-    return f"{num:.2f} %"
-
 def get_percentage_style(value):
     try:
         num = float(str(value).replace('%', ''))
@@ -46,6 +40,18 @@ def get_percentage_style(value):
     elif num < 0:
         return 'color: red; font-weight: bold'
     return 'color: black'
+
+def format_market_cap(value):
+    if pd.isna(value) or value == 0:
+        return '0'
+    num = float(value)
+    for unit in ['', 'K', 'M', 'B', 'T']:
+        if abs(num) < 1000:
+            result = f"{num:.2f}".rstrip('0').rstrip('.')
+            return f"{result}{unit}"
+        num /= 1000
+    result = f"{num:.2f}".rstrip('0').rstrip('.')
+    return f"{result}P"
 
 PERCENTAGE_COLUMNS = [
     'Change Today', '5-Day Change', '1-Month Change',
@@ -61,18 +67,25 @@ def display_results(df, screener, from_cache=False):
     
     for col in PERCENTAGE_COLUMNS:
         if col in display_df.columns:
-            display_df[col] = display_df[col].apply(format_percentage)
+            display_df[col] = display_df[col].fillna(0).round(2)
     
     st.subheader("Results")
     if from_cache:
         time.sleep(0.5)
     
     styled_df = display_df.style
+    
     for col in PERCENTAGE_COLUMNS:
         if col in display_df.columns:
+            styled_df = styled_df.format({col: "{:.2f}%"})
             styled_df = styled_df.map(get_percentage_style, subset=[col])
     
-    st.dataframe(styled_df, width='stretch', hide_index=True)
+    if 'Market Cap' in display_df.columns:
+        styled_df = styled_df.format({'Market Cap': format_market_cap})
+    
+    column_config = {col: st.column_config.NumberColumn(format="%.2f%%") for col in PERCENTAGE_COLUMNS if col in display_df.columns}
+    
+    st.dataframe(styled_df, column_config=column_config, width='stretch', hide_index=True)
     
     with st.expander("🔗 External Links"):
         for ticker in df['ticker']:
