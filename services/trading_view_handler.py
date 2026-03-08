@@ -6,44 +6,50 @@ import requests
 
 def authenticate(username: str, password: str) -> CookieJar:
     session = requests.Session()
-    r = session.post(
-       'https://www.tradingview.com/accounts/signin/', 
-       headers={'User-Agent': 'Mozilla/5.0', 'Referer': 'https://www.tradingview.com'}, 
-       data={'username': username, 'password': password, 'remember': 'on'}, 
-       timeout=60,
+    response = session.post(
+        'https://www.tradingview.com/accounts/signin/',
+        headers={
+            'User-Agent': 'Mozilla/5.0',
+            'Referer': 'https://www.tradingview.com'
+        },
+        data={'username': username, 'password': password, 'remember': 'on'},
+        timeout=60,
     )
-    r.raise_for_status()
-    if r.json().get('error'):
-        raise Exception(f'Failed to authenticate: \n{r.json()}')
+    response.raise_for_status()
+    if response.json().get('error'):
+        raise Exception(f'Authentication failed: {response.json()}')
     return session.cookies
 
-def screen_trading_view(pct_drop, cookies=None):
-    q = (
-        Query()
-        .select(
-            'name',
-            'description',
-            'sector',
-            'market_cap_basic',
-            'change',
-            'change|5',
-        )
-        .where(
-            col('exchange').isin(['AMEX', 'CBOE', 'NASDAQ', 'NYSE']),
-            col('is_primary') == True,
-            col('typespecs').has('common'),
-            col('typespecs').has_none_of('preferred'),
-            col('type') == 'stock',
-            col('change|5') < pct_drop  # 5-day change > 7%
-        )
-        .order_by('market_cap_basic', ascending=False, nulls_first=False)
-        .limit(3000)
-        .set_markets('america')
-        .set_property('preset', 'large_cap')
-        .set_property('symbols', {'query': {'types': ['stock', 'fund', 'dr', 'structured']}})
+def screen_trading_view(pct_drop=None, financials=False, cookies=None):
+    query = Query()
+    
+    query.select(
+        'name', 'description', 'sector', 'market_cap_basic', 'change',
+        'change|5', 'change|30', 'change|60', 'change|90', 'change|26', 'change|52',
     )
-    _, df = q.get_scanner_data(cookies=cookies)
-
+    
+    conditions = [
+        col('exchange').isin(['AMEX', 'CBOE', 'NASDAQ', 'NYSE']),
+        col('is_primary') == True,
+        col('typespecs').has('common'),
+        col('typespecs').has_none_of('preferred'),
+        col('type') == 'stock',
+    ]
+    
+    if pct_drop is not None:
+        conditions.append(col('change|5') < pct_drop)
+    
+    if financials:
+        conditions.append(col('change') > 0)
+    
+    query.where(*conditions)
+    query.order_by('market_cap_basic', ascending=False, nulls_first=False)
+    query.limit(3000)
+    query.set_markets('america')
+    query.set_property('preset', 'large_cap')
+    query.set_property('symbols', {'query': {'types': ['stock', 'fund', 'dr', 'structured']}})
+    
+    _, df = query.get_scanner_data(cookies=cookies)
     df['market_cap_basic'] = df['market_cap_basic'].apply(format_number)
-
+    
     return df

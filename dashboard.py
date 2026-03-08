@@ -1,47 +1,122 @@
 import streamlit as st
 from services.trading_view_handler import screen_trading_view
-from utils.cache import load_cache, save_cache
+from utils.cache import load_cache, save_cache, clear_all_cache
 from models.column_map import COLUMN_MAP
+from screeners.config import SCREENERS
+import time
 
-cookies = {'sessionid': 'SESSION_ID_HERE'}  # Replace with your actual session ID
+COOKIES = {'sessionid': 'SESSION_ID_HERE'}
 
 st.set_page_config(page_title="Stock Screener", layout="wide")
-st.title("📈 Stock Screener")
 
-def color_cell(val):
+title_col, options_col = st.columns([0.92, 0.08])
+
+with title_col:
+    st.title("📈 Stock Screener")
+
+with options_col:
+    st.write("")
+    st.write("")
+    with st.popover("⚙️", use_container_width=False):
+        st.subheader("Options", anchor=False)
+        session_id = st.text_input("Session ID", value=COOKIES.get('sessionid'), key="session_id_input")
+        if session_id != COOKIES.get('sessionid'):
+            COOKIES['sessionid'] = session_id
+            st.success("✅ Session ID updated!")
+        st.divider()
+        if st.button("🗑️ Clear Cache", key="clear_cache_button", use_container_width=True):
+            clear_all_cache()
+            st.success("✅ Cache cleared!")
+
+def format_percentage(value):
     try:
-        val_float = float(str(val).replace('%', ''))
+        num = float(str(value).replace('%', ''))
     except:
-        val_float = 0
-    color = 'green' if val_float > 0 else 'red' if val_float < 0 else 'black'
-    val_rounded = f"{val_float:.2f} %" 
-    return f'<span style="color:{color}; font-weight:bold">{val_rounded}</span>'
+        num = 0
+    return f"{num:.2f} %"
 
-if st.button("Run Screener"):
-    df = load_cache()
-    if df is None:
-        df = screen_trading_view(pct_drop=-7, cookies=cookies)
-        save_cache(df)
-        st.success("✅ Fetched new data!")
-    else:
-        st.info("📦 Loaded from cache.")
+def get_percentage_style(value):
+    try:
+        num = float(str(value).replace('%', ''))
+    except:
+        num = 0
+    
+    if num > 0:
+        return 'color: green; font-weight: bold'
+    elif num < 0:
+        return 'color: red; font-weight: bold'
+    return 'color: black'
 
+PERCENTAGE_COLUMNS = [
+    'Change Today', '5-Day Change', '1-Month Change',
+    '2-Month Change', '3-Month Change', '6-Month Change', '1-Year Change'
+]
+
+def display_results(df, screener, from_cache=False):
     if df.empty:
-        st.warning("⚠️ No major stocks dropped more than 7% over the last 5 trading days.")
+        st.warning(screener.get_warning_message())
+        return
+    
+    display_df = df.copy().rename(columns=COLUMN_MAP)
+    
+    for col in PERCENTAGE_COLUMNS:
+        if col in display_df.columns:
+            display_df[col] = display_df[col].apply(format_percentage)
+    
+    st.subheader("Results")
+    if from_cache:
+        time.sleep(0.5)
+    
+    styled_df = display_df.style
+    for col in PERCENTAGE_COLUMNS:
+        if col in display_df.columns:
+            styled_df = styled_df.map(get_percentage_style, subset=[col])
+    
+    st.dataframe(styled_df, width='stretch', hide_index=True)
+    
+    with st.expander("🔗 External Links"):
+        for ticker in df['ticker']:
+            col1, col2 = st.columns(2)
+            with col1:
+                st.markdown(f"[📈 Yahoo: {ticker}](https://finance.yahoo.com/quote/{ticker.split(':')[1]})")
+            with col2:
+                st.markdown(f"[📊 TradingView: {ticker}](https://www.tradingview.com/chart/?symbol={ticker})")
+
+st.subheader("Select a Screener")
+col1, col2, col3 = st.columns(3)
+
+screener_buttons = [
+    (col1, '📉 Drop 7%', 'drop_7_button', 'drop_7'),
+    (col2, '📉 Drop 5%', 'drop_5_button', 'drop_5'),
+    (col3, '💰 Strong Financials', 'financials_button', 'financials'),
+]
+
+selected_screener_key = None
+for col, label, key, screener_id in screener_buttons:
+    with col:
+        if st.button(label, key=key):
+            selected_screener_key = screener_id
+
+if selected_screener_key:
+    screener = SCREENERS[selected_screener_key]
+    criteria = screener.get_criteria()
+    
+    st.info(f"{screener.name} - {screener.description}")
+    
+    df = load_cache(screener_key=selected_screener_key)
+    from_cache = df is not None
+    
+    if df is None:
+        with st.spinner("📊 Fetching data..."):
+            if 'pct_drop' in criteria:
+                df = screen_trading_view(pct_drop=criteria['pct_drop'], cookies=COOKIES)
+            elif criteria.get('financials'):
+                df = screen_trading_view(financials=True, cookies=COOKIES)
+        save_cache(df, screener_key=selected_screener_key)
+        st.success("✅ Data fetched!")
     else:
-        df['TradingView Chart'] = df['ticker'].apply(
-            lambda t: f"<a href='https://www.tradingview.com/chart/?symbol={t}' target='_blank'>Open Chart</a>"
-        )
-        df = df.drop(columns=['ticker'])
-        df = df.rename(columns=COLUMN_MAP)
-
-        df['Change Today'] = df['Change Today'].apply(color_cell)
-        df['5-Day Change'] = df['5-Day Change'].apply(color_cell)
-
-        st.subheader("Results")
-        st.markdown(
-            df.to_html(escape=False, index=False),
-            unsafe_allow_html=True
-        )
+        st.success("📦 Cached data")
+    
+    display_results(df, screener, from_cache=from_cache)
 else:
-    st.write("👉 Click the button above to run the screener.")
+    st.write("Select a screener above")
