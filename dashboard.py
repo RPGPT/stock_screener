@@ -39,7 +39,7 @@ def get_percentage_style(value):
         return 'color: green; font-weight: bold'
     elif num < 0:
         return 'color: red; font-weight: bold'
-    return 'color: black'
+    return 'color: white'
 
 def format_market_cap(value):
     if pd.isna(value) or value == 0:
@@ -55,7 +55,7 @@ def format_market_cap(value):
 
 PERCENTAGE_COLUMNS = [
     'Change Today', '5-Day Change', '1-Month Change',
-    '2-Month Change', '3-Month Change', '6-Month Change', '1-Year Change'
+    '3-Month Change', '6-Month Change', '1-Year Change'
 ]
 
 def display_results(df, screener, from_cache=False):
@@ -64,6 +64,9 @@ def display_results(df, screener, from_cache=False):
         return
     
     display_df = df.copy().rename(columns=COLUMN_MAP)
+    
+    hidden_columns = ['3-Month Change','6-Month Change', '1-Year Change']
+    display_df = display_df.drop(columns=hidden_columns, errors='ignore')
     
     for col in PERCENTAGE_COLUMNS:
         if col in display_df.columns:
@@ -83,7 +86,10 @@ def display_results(df, screener, from_cache=False):
     if 'Market Cap' in display_df.columns:
         styled_df = styled_df.format({'Market Cap': format_market_cap})
     
-    column_config = {col: st.column_config.NumberColumn(format="%.2f%%") for col in PERCENTAGE_COLUMNS if col in display_df.columns}
+    column_config = {}
+    for col in PERCENTAGE_COLUMNS:
+        if col in display_df.columns:
+            column_config[col] = st.column_config.NumberColumn(format="%.2f%%")
     
     st.dataframe(styled_df, column_config=column_config, width='stretch', hide_index=True)
     

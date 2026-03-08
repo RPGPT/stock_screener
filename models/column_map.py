@@ -7,7 +7,6 @@ COLUMN_MAP = {
     "change": "Change Today",
     "change|5": "5-Day Change",
     "change|30": "1-Month Change",
-    "change|60": "2-Month Change",
     "change|90": "3-Month Change",
     "change|26": "6-Month Change",
     "change|52": "1-Year Change",

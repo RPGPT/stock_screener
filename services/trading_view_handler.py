@@ -24,7 +24,7 @@ def screen_trading_view(pct_drop=None, financials=False, cookies=None):
     
     query.select(
         'name', 'description', 'sector', 'market_cap_basic', 'change',
-        'change|5', 'change|30', 'change|60', 'change|90', 'change|26', 'change|52',
+        'change|5', 'change|30', 'change|90', 'change|26', 'change|52',
     )
     
     conditions = [
